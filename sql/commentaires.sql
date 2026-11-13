@@ -32,7 +32,7 @@ INSERT INTO commentaires (article_id, nom, texte, cree_le) VALUES
   (1, 'Nadia', 'Article clair, merci.', '2026-09-10T06:05:00.000Z'),
   (2, 'Hugo', 'Le noyer est magnifique. Combien de temps pour le séchage ?', '2026-09-17T10:30:00.000Z'),
   (2, 'Inès', 'Des photos de la pose seraient les bienvenues.', '2026-09-20T19:15:00.000Z'),
-  (4, 'Lucie', "J'ai une chaise à faire refaire, vous prenez les commandes ?", '2026-10-09T07:00:00.000Z'),
+  (4, 'Lucie', 'J ai une chaise à faire refaire, vous prenez les commandes ?', '2026-10-09T07:00:00.000Z'),
   (5, 'Claire', 'Aucune vis visible : comment sont fixés les caissons ?', '2026-10-16T12:22:00.000Z'),
   (5, 'Karim', 'Superbe travail.', '2026-10-18T17:47:00.000Z');
 
