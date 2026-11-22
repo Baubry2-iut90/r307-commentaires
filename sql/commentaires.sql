@@ -20,7 +20,7 @@ CREATE TABLE commentaires (
     article_id INT NOT NULL REFERENCES articles(id) ON DELETE CASCADE,
     nom VARCHAR(255) NOT NULL,
     texte TEXT NOT NULL CHECK (texte <> ''),
-    cree_le TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    cree_le TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 -- QUESTION 2 · Inserer les huit commentaires de data/commentaires.initial.json.
