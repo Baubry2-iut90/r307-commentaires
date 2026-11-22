@@ -3,62 +3,93 @@
 // ses routes. Le cote base la remplace par une version PostgreSQL, avec les MEMES fonctions.
 // Les articles, eux, sont deja dans PostgreSQL (services/articles.service.js).
 
-const fs = require('fs/promises');
-const path = require('path');
+const pool = require('../db/pool');
 const ErreurHttp = require('../utils/erreur-http');
-const articles = require('./articles.service');
-
-const FICHIER = path.join(__dirname, '..', 'data', 'commentaires.json');
-const lire = async () => JSON.parse(await fs.readFile(FICHIER, 'utf8'));
-const ecrire = (liste) => fs.writeFile(FICHIER, JSON.stringify(liste, null, 2));
-const introuvable = (id) => new ErreurHttp(404, 'COMMENTAIRE_INTROUVABLE', `Le commentaire ${id} n'existe pas.`);
 
 async function lister(articleId) {
-  await articles.trouver(articleId); // 404 si l'article n'existe pas
-  const tous = await lire();
-  return tous.filter((c) => c.article_id === articleId).sort((a, b) => a.cree_le.localeCompare(b.cree_le));
+  const article = await pool.query(
+    'SELECT id FROM articles WHERE id = $1',
+    [articleId]
+  );
+
+  if (article.rowCount === 0) {
+    throw new ErreurHttp(404, 'ARTICLE_INTROUVABLE', 'Article introuvable.');
+  }
+
+  const resultat = await pool.query(
+    'SELECT id, article_id, nom, texte, cree_le FROM commentaires WHERE article_id = $1 ORDER BY cree_le ASC',
+    [articleId]
+  );
+
+  return resultat.rows;
 }
 
 async function trouver(id) {
-  const commentaire = (await lire()).find((c) => c.id === id);
-  if (!commentaire) throw introuvable(id);
-  return commentaire;
+  const resultat = await pool.query(
+    'SELECT id, article_id, nom, texte, cree_le FROM commentaires WHERE id = $1',
+    [id]
+  );
+
+  if (resultat.rowCount === 0) {
+    throw new ErreurHttp(404, 'COMMENTAIRE_INTROUVABLE', 'Commentaire introuvable.');
+  }
+
+  return resultat.rows[0];
 }
 
 async function parVisiteur(nom) {
-  const siens = (await lire()).filter((c) => c.nom === nom).sort((a, b) => b.cree_le.localeCompare(a.cree_le));
-  const resultat = [];
-  for (const c of siens) {
-    const article = await articles.trouver(c.article_id);
-    resultat.push({ id: c.id, article_id: c.article_id, titre: article.titre, texte: c.texte, cree_le: c.cree_le });
+  const resultat = await pool.query(
+    'SELECT c.id, c.article_id, a.titre, c.texte, c.cree_le FROM commentaires c JOIN articles a ON c.article_id = a.id WHERE c.nom = $1 ORDER BY c.cree_le DESC',
+    [nom]
+  );
+
+  return resultat.rows;
+}
+
+async function creer(articleId, donnees) {
+  try {
+    const resultat = await pool.query(
+      'INSERT INTO commentaires (article_id, nom, texte) VALUES ($1, $2, $3) RETURNING id, article_id, nom, texte, cree_le',
+      [articleId, donnees.nom, donnees.texte]
+    );
+    return resultat.rows[0];
+  } catch (err) {
+    if (err.code === '23503') {
+      throw new ErreurHttp(404, 'ARTICLE_INTROUVABLE', 'Article introuvable.');
+    }
+    throw err;
   }
-  return resultat;
 }
 
-async function creer(articleId, { nom, texte }) {
-  await articles.trouver(articleId);
-  const tous = await lire();
-  const id = tous.length === 0 ? 1 : Math.max(...tous.map((c) => c.id)) + 1;
-  const commentaire = { id, article_id: articleId, nom, texte, cree_le: new Date().toISOString() };
-  tous.push(commentaire);
-  await ecrire(tous);
-  return commentaire;
-}
+async function modifier(id, donnees) {
+  const resultat = await pool.query(
+    'UPDATE commentaires SET texte = $1 WHERE id = $2 RETURNING id, article_id, nom, texte, cree_le',
+    [donnees.texte, id]
+  );
 
-async function modifier(id, { texte }) {
-  const tous = await lire();
-  const commentaire = tous.find((c) => c.id === id);
-  if (!commentaire) throw introuvable(id);
-  commentaire.texte = texte;
-  await ecrire(tous);
-  return commentaire;
+  if (resultat.rowCount === 0) {
+    throw new ErreurHttp(404, 'COMMENTAIRE_INTROUVABLE', 'Commentaire introuvable.');
+  }
+
+  return resultat.rows[0];
 }
 
 async function supprimer(id) {
-  const tous = await lire();
-  const restants = tous.filter((c) => c.id !== id);
-  if (restants.length === tous.length) throw introuvable(id);
-  await ecrire(restants);
+  const resultat = await pool.query(
+    'DELETE FROM commentaires WHERE id = $1',
+    [id]
+  );
+
+  if (resultat.rowCount === 0) {
+    throw new ErreurHttp(404, 'COMMENTAIRE_INTROUVABLE', 'Commentaire introuvable.');
+  }
 }
 
-module.exports = { lister, trouver, parVisiteur, creer, modifier, supprimer };
+module.exports = {
+  lister,
+  trouver,
+  parVisiteur,
+  creer,
+  modifier,
+  supprimer
+};
